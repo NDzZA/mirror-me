@@ -1,10 +1,9 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 export default function Home() {
-  const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const [dragging, setDragging] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -86,11 +85,24 @@ export default function Home() {
           <p className="upload-title">{loading ? "AI 分析中，请稍候…" : "上传一张正脸照片"}</p>
           <p className="upload-sub">{loading ? "正在解读你的专属风格特征" : "建议光线均匀、正脸清晰\n照片仅用于分析，不会保存"}</p>
           {error && <p className="error-msg">{error}</p>}
-          <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp"
-            style={{ display: "none" }} onChange={(e) => handleFile(e.target.files?.[0] ?? null)} disabled={loading} />
-          <button className="upload-btn" onClick={() => !loading && inputRef.current?.click()} disabled={loading}>
+          <label
+            className="upload-btn"
+            style={{
+              display: "block",
+              textAlign: "center",
+              cursor: loading ? "not-allowed" : "pointer",
+              opacity: loading ? 0.7 : 1,
+            }}
+          >
             {loading ? "分析中…" : "选择照片 →"}
-          </button>
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              style={{ display: "none" }}
+              onChange={(e) => !loading && handleFile(e.target.files?.[0] ?? null)}
+              disabled={loading}
+            />
+          </label>
         </div>
         <p className="hint">支持 JPG / PNG · 建议正面 · 光线均匀</p>
       </section>
@@ -163,10 +175,9 @@ export default function Home() {
         .upload-title { font-size:15px; font-weight:500; color:#1E1440; }
         .upload-sub { font-size:12px; color:rgba(45,31,94,0.62); text-align:center; line-height:1.7; white-space:pre-line; }
         .error-msg { font-size:12px; color:#c0392b; background:rgba(255,255,255,0.5); padding:6px 14px; border-radius:12px; }
-        .upload-btn { background:rgba(75,52,165,0.82); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); border:1px solid rgba(255,255,255,0.28); color:rgba(255,255,255,0.96); border-radius:50px; padding:13px 0; font-size:14px; font-weight:500; cursor:pointer; width:100%; letter-spacing:0.5px; transition:background 0.2s,transform 0.1s; }
-        .upload-btn:hover:not(:disabled) { background:rgba(90,65,185,0.9); }
-        .upload-btn:active:not(:disabled) { transform:scale(0.98); }
-        .upload-btn:disabled { cursor:not-allowed; opacity:0.7; }
+        .upload-btn { background:rgba(75,52,165,0.82); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); border:1px solid rgba(255,255,255,0.28); color:rgba(255,255,255,0.96); border-radius:50px; padding:13px 0; font-size:14px; font-weight:500; width:100%; letter-spacing:0.5px; transition:background 0.2s,transform 0.1s; }
+        .upload-btn:hover { background:rgba(90,65,185,0.9); }
+        .upload-btn:active { transform:scale(0.98); }
         .hint { font-size:12px; color:rgba(45,31,94,0.48); text-align:center; margin-bottom:28px; }
         .steps { position:relative; z-index:2; display:flex; align-items:center; justify-content:center; padding:0 20px 26px; }
         .step-wrap { display:flex; align-items:center; }
