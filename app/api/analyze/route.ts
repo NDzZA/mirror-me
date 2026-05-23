@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         model: "Qwen/Qwen3-VL-32B-Instruct",
-        max_tokens: 1000,
+        max_tokens: 2000,
         messages: [
           {
             role: "system",
@@ -25,14 +25,28 @@ export async function POST(req: NextRequest) {
 {
   "styleType": "风格类型名称（如：清冷少女、知性优雅、甜美活力、御姐气场、温柔仙气、复古文艺）",
   "keywords": ["气质词1", "气质词2", "气质词3"],
-  "description": "100字左右的风格描述，可以提及接近某种古典或影视形象的气质，语气要像朋友聊天，温暖有共鸣",
-  "makeupTips": {
-    "daily": "日常妆容建议，30字左右",
-    "date": "约会妆容建议，30字左右",
-    "work": "职场妆容建议，30字左右",
-    "party": "派对妆容建议，30字左右"
+  "description": "100字左右的风格描述，语气像朋友聊天，温暖有共鸣",
+  "faceType": "脸型类型，如：鹅蛋脸、心形脸、圆脸、方脸、长脸等",
+  "faceFeatures": ["面部特征标签1", "面部特征标签2", "面部特征标签3"],
+  "faceDescription": "30字左右，描述脸型气质特点",
+  "hairRecommend": {
+    "best": { "name": "最推荐发型名称", "reasons": ["推荐理由1", "推荐理由2", "推荐理由3"] },
+    "good": ["推荐发型1", "推荐发型2", "推荐发型3", "推荐发型4"],
+    "notGood": ["不推荐发型1", "不推荐发型2", "不推荐发型3", "不推荐发型4"]
   },
-  "colorPalette": ["适合的颜色1", "适合的颜色2", "适合的颜色3"]
+  "makeupDetail": {
+    "eye": "眼妆建议，20字左右",
+    "blush": "腮红建议，20字左右",
+    "lip": "唇妆建议，20字左右",
+    "base": "底妆建议，20字左右",
+    "nose": "鼻影建议，20字左右"
+  },
+  "makeupPoints": ["妆容要点1", "妆容要点2", "妆容要点3"],
+  "colorPalette": {
+    "eyeshadow": ["颜色名1", "颜色名2"],
+    "blush": ["颜色名1", "颜色名2"],
+    "lip": ["颜色名1", "颜色名2"]
+  }
 }`,
           },
           {
