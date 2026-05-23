@@ -44,7 +44,6 @@ const colorMap: Record<string, string> = {
 };
 function getColor(name: string): string { return colorMap[name] ?? "#e8b0b8"; }
 
-// 调用生成接口
 async function generateImage(image: string, prompt: string): Promise<string | null> {
   try {
     const res = await fetch("/api/generate", {
@@ -57,12 +56,10 @@ async function generateImage(image: string, prompt: string): Promise<string | nu
   } catch { return null; }
 }
 
-// 根据发型名称生成prompt
 function hairPrompt(hairName: string): string {
   return `这是一张真实人物照片。请保持照片的真实感，保持人物的脸型、五官、妆容、肤色完全不变，仅将发型改为${hairName}。发丝要有真实质感，像真实发型照片，不要卡通化，不要过度美颜。`;
 }
 
-// 根据部位生成局部特写prompt
 function makeupPrompt(part: string, desc: string): string {
   const partMap: Record<string, string> = {
     eye: "眼部区域特写，放大眼睛部分",
@@ -75,7 +72,6 @@ function makeupPrompt(part: string, desc: string): string {
   return `这是一张真实人物照片。请裁取并放大人物的${area}，在该部位画上${desc}，效果自然真实，像专业美妆教程的局部特写图，保持照片质感，不要卡通化。`;
 }
 
-// 图片加载占位组件
 function ImgSlot({ src, alt, className, loading }: { src: string | null; alt: string; className: string; loading: boolean }) {
   if (loading) return (
     <div className={`${className} img-loading`}>
@@ -92,11 +88,9 @@ export default function ResultPage() {
   const [result, setResult] = useState<MirrorResult | null>(null);
   const [userImage, setUserImage] = useState<string | null>(null);
 
-  // 发型图：最适合你 + good[0..2]
   const [hairImgs, setHairImgs] = useState<(string | null)[]>([null, null, null, null]);
   const [hairLoading, setHairLoading] = useState([true, true, true, true]);
 
-  // 妆容特写图：eye, blush, lip, base, nose
   const [makeupImgs, setMakeupImgs] = useState<(string | null)[]>([null, null, null, null, null]);
   const [makeupLoading, setMakeupLoading] = useState([false, false, false, false, false]);
   const makeupStarted = useRef(false);
@@ -111,11 +105,11 @@ export default function ResultPage() {
     if (img) setUserImage(img);
   }, [router]);
 
-  // 第一批：发型图，result加载完立即生成
   useEffect(() => {
     if (!result || !userImage) return;
-    const { best, good } = result.hairRecommend;
-    const targets = [best.name, good[0], good[1], good[2]];
+    const best = result.hairRecommend?.best?.name ?? "";
+    const good = result.hairRecommend?.good ?? [];
+    const targets = [best, good[0] ?? "", good[1] ?? "", good[2] ?? ""];
 
     Promise.all(
       targets.map((name, i) =>
@@ -127,7 +121,6 @@ export default function ResultPage() {
     );
   }, [result, userImage]);
 
-  // 第二批：妆容特写，滚动到妆容区域时触发
   useEffect(() => {
     if (!result || !userImage) return;
     const observer = new IntersectionObserver(
@@ -137,11 +130,11 @@ export default function ResultPage() {
           setMakeupLoading([true, true, true, true, true]);
           const parts = ["eye", "blush", "lip", "base", "nose"] as const;
           const descs = [
-            result.makeupDetail.eye,
-            result.makeupDetail.blush,
-            result.makeupDetail.lip,
-            result.makeupDetail.base,
-            result.makeupDetail.nose,
+            result.makeupDetail?.eye ?? "",
+            result.makeupDetail?.blush ?? "",
+            result.makeupDetail?.lip ?? "",
+            result.makeupDetail?.base ?? "",
+            result.makeupDetail?.nose ?? "",
           ];
           Promise.all(
             parts.map((part, i) =>
@@ -168,7 +161,39 @@ export default function ResultPage() {
     );
   }
 
-  const { hairRecommend, makeupDetail, makeupPoints, colorPalette, faceType, faceFeatures, faceDescription, keywords } = result;
+  const {
+    hairRecommend,
+    makeupDetail,
+    makeupPoints = [],
+    colorPalette = { eyeshadow: [], blush: [], lip: [] },
+    faceType = "",
+    faceFeatures = [],
+    faceDescription = "",
+    keywords = [],
+  } = result;
+
+  const safeHairRecommend = {
+    best: {
+      name: hairRecommend?.best?.name ?? "",
+      reasons: hairRecommend?.best?.reasons ?? [],
+    },
+    good: hairRecommend?.good ?? [],
+    notGood: hairRecommend?.notGood ?? [],
+  };
+
+  const safeMakeupDetail = {
+    eye: makeupDetail?.eye ?? "",
+    blush: makeupDetail?.blush ?? "",
+    lip: makeupDetail?.lip ?? "",
+    base: makeupDetail?.base ?? "",
+    nose: makeupDetail?.nose ?? "",
+  };
+
+  const safeColorPalette = {
+    eyeshadow: colorPalette?.eyeshadow ?? [],
+    blush: colorPalette?.blush ?? [],
+    lip: colorPalette?.lip ?? [],
+  };
 
   return (
     <main className="hime-page">
@@ -185,21 +210,19 @@ export default function ResultPage() {
 
       <div className="hime-content">
 
-        {/* 标题 */}
         <div className="hime-header">
           <div className="gold-deco">✦ ✦ ✦</div>
           <h1 className="hime-main-title">发 型 风 格 诊 断</h1>
           <div className="hime-sub-title">最适合你的发型是？</div>
-          <div className="diagnosis-card">
-            <div className="diag-title">✦ 诊断要点</div>
-            {keywords.map((k) => <div key={k} className="check-pt">{k}</div>)}
-          </div>
+          {keywords.length > 0 && (
+            <div className="diagnosis-card">
+              <div className="diag-title">✦ 诊断要点</div>
+              {keywords.map((k) => <div key={k} className="check-pt">{k}</div>)}
+            </div>
+          )}
         </div>
 
-        {/* 发型三栏 */}
         <div className="hair-grid">
-
-          {/* 最适合你 */}
           <div className="crown-card">
             <div className="crown-label"><span className="crown-icon">♛</span> 最 适 合 你</div>
             <ImgSlot
@@ -208,11 +231,10 @@ export default function ResultPage() {
               className="hair-portrait"
               loading={hairLoading[0]}
             />
-            <div className="hair-best-name">{hairRecommend.best.name}</div>
-            {hairRecommend.best.reasons.map((r) => <div key={r} className="heart-pt">{r}</div>)}
+            <div className="hair-best-name">{safeHairRecommend.best.name}</div>
+            {safeHairRecommend.best.reasons.map((r) => <div key={r} className="heart-pt">{r}</div>)}
           </div>
 
-          {/* GOOD */}
           <div className="royal-card">
             <span className="corner-gold tl">✦</span><span className="corner-gold tr">✦</span>
             <span className="corner-gold bl">✦</span><span className="corner-gold br">✦</span>
@@ -222,23 +244,22 @@ export default function ResultPage() {
                 <div key={i} style={{ textAlign: "center" }}>
                   <ImgSlot
                     src={hairImgs[i + 1]}
-                    alt={hairRecommend.good[i]}
+                    alt={safeHairRecommend.good[i] ?? ""}
                     className="hair-thumb"
                     loading={hairLoading[i + 1]}
                   />
-                  <div className="hair-thumb-label">{hairRecommend.good[i]}</div>
+                  <div className="hair-thumb-label">{safeHairRecommend.good[i] ?? ""}</div>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* NOT推荐：纯文字 */}
           <div className="not-rec-card">
             <span className="corner-pink tl">✦</span><span className="corner-pink tr">✦</span>
             <span className="corner-pink bl">✦</span><span className="corner-pink br">✦</span>
             <div className="section-label muted">NOT RECOMMENDED</div>
             <div className="hair-tag-grid">
-              {hairRecommend.notGood.map((h) => (
+              {safeHairRecommend.notGood.map((h) => (
                 <div key={h} className="hair-tag not">{h}</div>
               ))}
             </div>
@@ -247,33 +268,25 @@ export default function ResultPage() {
 
         <div className="gold-divider">· · · ✦ ✦ ✦ · · ·</div>
 
-        {/* 妆容区 - 懒加载触发点 */}
         <div ref={makeupSectionRef}>
           <div className="makeup-section-title">妆 容 分 析 指 南</div>
           <div className="makeup-section-sub">让你魅力全开的妆容平衡</div>
 
           <div className="makeup-grid">
-            {/* 左列 */}
             <div className="makeup-left">
               {([
-                { key: "eye", label: "✦ 眼妆", text: makeupDetail.eye, idx: 0 },
-                { key: "blush", label: "✦ 腮红", text: makeupDetail.blush, idx: 1 },
-                { key: "lip", label: "✦ 唇妆", text: makeupDetail.lip, idx: 2 },
+                { key: "eye", label: "✦ 眼妆", text: safeMakeupDetail.eye, idx: 0 },
+                { key: "blush", label: "✦ 腮红", text: safeMakeupDetail.blush, idx: 1 },
+                { key: "lip", label: "✦ 唇妆", text: safeMakeupDetail.lip, idx: 2 },
               ] as const).map((item) => (
                 <div key={item.key} className="feat-card">
                   <div className="flabel">{item.label}</div>
-                  <ImgSlot
-                    src={makeupImgs[item.idx]}
-                    alt={item.label}
-                    className="makeup-thumb"
-                    loading={makeupLoading[item.idx]}
-                  />
+                  <ImgSlot src={makeupImgs[item.idx]} alt={item.label} className="makeup-thumb" loading={makeupLoading[item.idx]} />
                   <div className="fdesc">{item.text}</div>
                 </div>
               ))}
             </div>
 
-            {/* 中间大图 */}
             <div className="makeup-center">
               {userImage
                 ? <img src={userImage} alt="面部大图" className="face-portrait" />
@@ -281,35 +294,28 @@ export default function ResultPage() {
               }
             </div>
 
-            {/* 右列 */}
             <div className="makeup-right">
               <div className="feat-card">
                 <div className="flabel">✦ 脸型诊断</div>
                 <div className="face-tags">
-                  <span className="tag-pill">{faceType}</span>
+                  {faceType && <span className="tag-pill">{faceType}</span>}
                   {faceFeatures.map((f) => <span key={f} className="tag-pill">{f}</span>)}
                 </div>
-                <div className="fdesc" style={{ marginTop: 6 }}>{faceDescription}</div>
+                {faceDescription && <div className="fdesc" style={{ marginTop: 6 }}>{faceDescription}</div>}
               </div>
               {([
-                { key: "base", label: "✦ 底妆", text: makeupDetail.base, idx: 3 },
-                { key: "nose", label: "✦ 鼻影", text: makeupDetail.nose, idx: 4 },
+                { key: "base", label: "✦ 底妆", text: safeMakeupDetail.base, idx: 3 },
+                { key: "nose", label: "✦ 鼻影", text: safeMakeupDetail.nose, idx: 4 },
               ] as const).map((item) => (
                 <div key={item.key} className="feat-card">
                   <div className="flabel">{item.label}</div>
-                  <ImgSlot
-                    src={makeupImgs[item.idx]}
-                    alt={item.label}
-                    className="makeup-thumb"
-                    loading={makeupLoading[item.idx]}
-                  />
+                  <ImgSlot src={makeupImgs[item.idx]} alt={item.label} className="makeup-thumb" loading={makeupLoading[item.idx]} />
                   <div className="fdesc">{item.text}</div>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* 底部两栏 */}
           <div className="bottom-row">
             <div className="royal-card" style={{ flex: 1 }}>
               <span className="corner-gold tl">✦</span><span className="corner-gold tr">✦</span>
@@ -323,9 +329,9 @@ export default function ResultPage() {
               <div className="bottom-title">✦ 推荐色彩</div>
               <div className="color-row">
                 {([
-                  { label: "眼影", colors: colorPalette.eyeshadow },
-                  { label: "腮红", colors: colorPalette.blush },
-                  { label: "唇色", colors: colorPalette.lip },
+                  { label: "眼影", colors: safeColorPalette.eyeshadow },
+                  { label: "腮红", colors: safeColorPalette.blush },
+                  { label: "唇色", colors: safeColorPalette.lip },
                 ]).map((col) => (
                   <div key={col.label} className="color-col">
                     <div className="color-label">{col.label}</div>
@@ -339,7 +345,6 @@ export default function ResultPage() {
           </div>
         </div>
 
-        {/* CTA */}
         <div style={{ textAlign: "center", marginTop: 24 }}>
           <button className="cta-btn" onClick={() => router.push("/tryon")}>
             ✨ 看看我化妆后的样子 →
