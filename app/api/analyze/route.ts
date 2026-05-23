@@ -55,8 +55,7 @@ export async function POST(req: NextRequest) {
               {
                 type: "image_url",
                 image_url: {
-                  url: image,
-                  detail: "high",
+                  url: `data:image/jpeg;base64,${image.replace(/^data:image\/\w+;base64,/, '')}`,
                 },
               },
               {

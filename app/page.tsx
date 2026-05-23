@@ -41,7 +41,7 @@ export default function HomePage() {
         })
         const data = await res.json()
         clearInterval(interval)
-        sessionStorage.setItem('analysisResult', JSON.stringify(data))
+        sessionStorage.setItem('mirrorResult', JSON.stringify(data))
         router.push('/result')
       } catch {
         clearInterval(interval)
