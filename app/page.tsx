@@ -18,7 +18,7 @@ export default function HomePage() {
   ]
 
   const handleFile = async (file: File) => {
-    if (!file.type.startsWith('image/')) return
+    if (!file) return
 
     const reader = new FileReader()
     reader.onload = async (e) => {

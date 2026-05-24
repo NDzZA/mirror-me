@@ -105,22 +105,25 @@ export default function ResultPage() {
     if (img) setUserImage(img);
   }, [router]);
 
+  // 串行生成发型图，一张完成再生成下一张
   useEffect(() => {
     if (!result || !userImage) return;
     const best = result.hairRecommend?.best?.name ?? "";
     const good = result.hairRecommend?.good ?? [];
     const targets = [best, good[0] ?? "", good[1] ?? "", good[2] ?? ""];
 
-    Promise.all(
-      targets.map((name, i) =>
-        generateImage(userImage, hairPrompt(name)).then((url) => {
-          setHairImgs((prev) => { const n = [...prev]; n[i] = url; return n; });
-          setHairLoading((prev) => { const n = [...prev]; n[i] = false; return n; });
-        })
-      )
-    );
+    const generateSequentially = async () => {
+      for (let i = 0; i < targets.length; i++) {
+        const url = await generateImage(userImage, hairPrompt(targets[i]));
+        setHairImgs((prev) => { const n = [...prev]; n[i] = url; return n; });
+        setHairLoading((prev) => { const n = [...prev]; n[i] = false; return n; });
+      }
+    };
+
+    generateSequentially();
   }, [result, userImage]);
 
+  // 串行生成妆容特写图，滚动到妆容区域时触发
   useEffect(() => {
     if (!result || !userImage) return;
     const observer = new IntersectionObserver(
@@ -128,6 +131,7 @@ export default function ResultPage() {
         if (entries[0].isIntersecting && !makeupStarted.current) {
           makeupStarted.current = true;
           setMakeupLoading([true, true, true, true, true]);
+
           const parts = ["eye", "blush", "lip", "base", "nose"] as const;
           const descs = [
             result.makeupDetail?.eye ?? "",
@@ -136,14 +140,16 @@ export default function ResultPage() {
             result.makeupDetail?.base ?? "",
             result.makeupDetail?.nose ?? "",
           ];
-          Promise.all(
-            parts.map((part, i) =>
-              generateImage(userImage, makeupPrompt(part, descs[i])).then((url) => {
-                setMakeupImgs((prev) => { const n = [...prev]; n[i] = url; return n; });
-                setMakeupLoading((prev) => { const n = [...prev]; n[i] = false; return n; });
-              })
-            )
-          );
+
+          const generateSequentially = async () => {
+            for (let i = 0; i < parts.length; i++) {
+              const url = await generateImage(userImage, makeupPrompt(parts[i], descs[i]));
+              setMakeupImgs((prev) => { const n = [...prev]; n[i] = url; return n; });
+              setMakeupLoading((prev) => { const n = [...prev]; n[i] = false; return n; });
+            }
+          };
+
+          generateSequentially();
         }
       },
       { threshold: 0.1 }
