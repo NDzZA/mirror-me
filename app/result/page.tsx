@@ -72,15 +72,29 @@ function makeupPrompt(part: string, desc: string): string {
   return `这是一张真实人物照片。请裁取并放大人物的${area}，在该部位画上${desc}，效果自然真实，像专业美妆教程的局部特写图，保持照片质感，不要卡通化。`;
 }
 
-function ImgSlot({ src, alt, className, loading }: { src: string | null; alt: string; className: string; loading: boolean }) {
+// 点击生成的图片槽
+function ImgSlot({
+  src, alt, className, loading, onGenerate
+}: {
+  src: string | null;
+  alt: string;
+  className: string;
+  loading: boolean;
+  onGenerate: () => void;
+}) {
   if (loading) return (
     <div className={`${className} img-loading`}>
       <div className="img-spinner" />
       <span>生成中…</span>
     </div>
   );
-  if (!src) return <div className={`${className} img-error`}>生成失败</div>;
-  return <img src={src} alt={alt} className={className} />;
+  if (src) return <img src={src} alt={alt} className={className} />;
+  return (
+    <div className={`${className} img-placeholder`} onClick={onGenerate}>
+      <div className="gen-icon">✦</div>
+      <div className="gen-hint">点击生成</div>
+    </div>
+  );
 }
 
 export default function ResultPage() {
@@ -89,11 +103,11 @@ export default function ResultPage() {
   const [userImage, setUserImage] = useState<string | null>(null);
 
   const [hairImgs, setHairImgs] = useState<(string | null)[]>([null, null, null, null]);
-  const [hairLoading, setHairLoading] = useState([true, true, true, true]);
+  const [hairLoading, setHairLoading] = useState([false, false, false, false]);
 
   const [makeupImgs, setMakeupImgs] = useState<(string | null)[]>([null, null, null, null, null]);
   const [makeupLoading, setMakeupLoading] = useState([false, false, false, false, false]);
-  const makeupStarted = useRef(false);
+
   const makeupSectionRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -105,58 +119,21 @@ export default function ResultPage() {
     if (img) setUserImage(img);
   }, [router]);
 
-  // 串行生成发型图，一张完成再生成下一张
-  useEffect(() => {
-    if (!result || !userImage) return;
-    const best = result.hairRecommend?.best?.name ?? "";
-    const good = result.hairRecommend?.good ?? [];
-    const targets = [best, good[0] ?? "", good[1] ?? "", good[2] ?? ""];
+  const handleHairGen = async (i: number, name: string) => {
+    if (!userImage || hairLoading[i] || hairImgs[i]) return;
+    setHairLoading((prev) => { const n = [...prev]; n[i] = true; return n; });
+    const url = await generateImage(userImage, hairPrompt(name));
+    setHairImgs((prev) => { const n = [...prev]; n[i] = url; return n; });
+    setHairLoading((prev) => { const n = [...prev]; n[i] = false; return n; });
+  };
 
-    const generateSequentially = async () => {
-      for (let i = 0; i < targets.length; i++) {
-        const url = await generateImage(userImage, hairPrompt(targets[i]));
-        setHairImgs((prev) => { const n = [...prev]; n[i] = url; return n; });
-        setHairLoading((prev) => { const n = [...prev]; n[i] = false; return n; });
-      }
-    };
-
-    generateSequentially();
-  }, [result, userImage]);
-
-  // 串行生成妆容特写图，滚动到妆容区域时触发
-  useEffect(() => {
-    if (!result || !userImage) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && !makeupStarted.current) {
-          makeupStarted.current = true;
-          setMakeupLoading([true, true, true, true, true]);
-
-          const parts = ["eye", "blush", "lip", "base", "nose"] as const;
-          const descs = [
-            result.makeupDetail?.eye ?? "",
-            result.makeupDetail?.blush ?? "",
-            result.makeupDetail?.lip ?? "",
-            result.makeupDetail?.base ?? "",
-            result.makeupDetail?.nose ?? "",
-          ];
-
-          const generateSequentially = async () => {
-            for (let i = 0; i < parts.length; i++) {
-              const url = await generateImage(userImage, makeupPrompt(parts[i], descs[i]));
-              setMakeupImgs((prev) => { const n = [...prev]; n[i] = url; return n; });
-              setMakeupLoading((prev) => { const n = [...prev]; n[i] = false; return n; });
-            }
-          };
-
-          generateSequentially();
-        }
-      },
-      { threshold: 0.1 }
-    );
-    if (makeupSectionRef.current) observer.observe(makeupSectionRef.current);
-    return () => observer.disconnect();
-  }, [result, userImage]);
+  const handleMakeupGen = async (i: number, part: string, desc: string) => {
+    if (!userImage || makeupLoading[i] || makeupImgs[i]) return;
+    setMakeupLoading((prev) => { const n = [...prev]; n[i] = true; return n; });
+    const url = await generateImage(userImage, makeupPrompt(part, desc));
+    setMakeupImgs((prev) => { const n = [...prev]; n[i] = url; return n; });
+    setMakeupLoading((prev) => { const n = [...prev]; n[i] = false; return n; });
+  };
 
   if (!result) {
     return (
@@ -201,6 +178,14 @@ export default function ResultPage() {
     lip: colorPalette?.lip ?? [],
   };
 
+  const makeupParts = [
+    { key: "eye", desc: safeMakeupDetail.eye },
+    { key: "blush", desc: safeMakeupDetail.blush },
+    { key: "lip", desc: safeMakeupDetail.lip },
+    { key: "base", desc: safeMakeupDetail.base },
+    { key: "nose", desc: safeMakeupDetail.nose },
+  ];
+
   return (
     <main className="hime-page">
       <style>{baseStyle}</style>
@@ -219,7 +204,7 @@ export default function ResultPage() {
         <div className="hime-header">
           <div className="gold-deco">✦ ✦ ✦</div>
           <h1 className="hime-main-title">发 型 风 格 诊 断</h1>
-          <div className="hime-sub-title">最适合你的发型是？</div>
+          <div className="hime-sub-title">点击图片区域即可生成效果</div>
           {keywords.length > 0 && (
             <div className="diagnosis-card">
               <div className="diag-title">✦ 诊断要点</div>
@@ -229,6 +214,7 @@ export default function ResultPage() {
         </div>
 
         <div className="hair-grid">
+          {/* 最适合你 */}
           <div className="crown-card">
             <div className="crown-label"><span className="crown-icon">♛</span> 最 适 合 你</div>
             <ImgSlot
@@ -236,11 +222,13 @@ export default function ResultPage() {
               alt="最适合你的发型"
               className="hair-portrait"
               loading={hairLoading[0]}
+              onGenerate={() => handleHairGen(0, safeHairRecommend.best.name)}
             />
             <div className="hair-best-name">{safeHairRecommend.best.name}</div>
             {safeHairRecommend.best.reasons.map((r) => <div key={r} className="heart-pt">{r}</div>)}
           </div>
 
+          {/* GOOD */}
           <div className="royal-card">
             <span className="corner-gold tl">✦</span><span className="corner-gold tr">✦</span>
             <span className="corner-gold bl">✦</span><span className="corner-gold br">✦</span>
@@ -253,6 +241,7 @@ export default function ResultPage() {
                     alt={safeHairRecommend.good[i] ?? ""}
                     className="hair-thumb"
                     loading={hairLoading[i + 1]}
+                    onGenerate={() => handleHairGen(i + 1, safeHairRecommend.good[i] ?? "")}
                   />
                   <div className="hair-thumb-label">{safeHairRecommend.good[i] ?? ""}</div>
                 </div>
@@ -260,6 +249,7 @@ export default function ResultPage() {
             </div>
           </div>
 
+          {/* NOT推荐 */}
           <div className="not-rec-card">
             <span className="corner-pink tl">✦</span><span className="corner-pink tr">✦</span>
             <span className="corner-pink bl">✦</span><span className="corner-pink br">✦</span>
@@ -276,7 +266,7 @@ export default function ResultPage() {
 
         <div ref={makeupSectionRef}>
           <div className="makeup-section-title">妆 容 分 析 指 南</div>
-          <div className="makeup-section-sub">让你魅力全开的妆容平衡</div>
+          <div className="makeup-section-sub">点击图片区域生成局部特写</div>
 
           <div className="makeup-grid">
             <div className="makeup-left">
@@ -287,7 +277,13 @@ export default function ResultPage() {
               ] as const).map((item) => (
                 <div key={item.key} className="feat-card">
                   <div className="flabel">{item.label}</div>
-                  <ImgSlot src={makeupImgs[item.idx]} alt={item.label} className="makeup-thumb" loading={makeupLoading[item.idx]} />
+                  <ImgSlot
+                    src={makeupImgs[item.idx]}
+                    alt={item.label}
+                    className="makeup-thumb"
+                    loading={makeupLoading[item.idx]}
+                    onGenerate={() => handleMakeupGen(item.idx, makeupParts[item.idx].key, makeupParts[item.idx].desc)}
+                  />
                   <div className="fdesc">{item.text}</div>
                 </div>
               ))}
@@ -315,7 +311,13 @@ export default function ResultPage() {
               ] as const).map((item) => (
                 <div key={item.key} className="feat-card">
                   <div className="flabel">{item.label}</div>
-                  <ImgSlot src={makeupImgs[item.idx]} alt={item.label} className="makeup-thumb" loading={makeupLoading[item.idx]} />
+                  <ImgSlot
+                    src={makeupImgs[item.idx]}
+                    alt={item.label}
+                    className="makeup-thumb"
+                    loading={makeupLoading[item.idx]}
+                    onGenerate={() => handleMakeupGen(item.idx, makeupParts[item.idx].key, makeupParts[item.idx].desc)}
+                  />
                   <div className="fdesc">{item.text}</div>
                 </div>
               ))}
@@ -431,6 +433,13 @@ const baseStyle = `
   .fdesc { font-size:10px; color:#7a5058; line-height:1.6; }
   .makeup-thumb { width:100%; height:54px; object-fit:cover; border-radius:6px; border:0.5px solid #e8c8d0; margin-bottom:4px; }
 
+  .img-placeholder { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
+    background:linear-gradient(160deg,#fff8f0,#fff2f5); border:0.5px dashed #e0c080;
+    border-radius:8px; cursor:pointer; transition:background 0.2s; margin-bottom:4px; }
+  .img-placeholder:hover { background:linear-gradient(160deg,#fff2e8,#ffecf0); }
+  .gen-icon { font-size:16px; color:#c8a060; }
+  .gen-hint { font-size:9px; color:#c8a060; letter-spacing:1px; }
+
   .face-tags { display:flex; flex-wrap:wrap; gap:3px; margin-bottom:2px; }
   .tag-pill { display:inline-block; background:#fde8ee; border:0.5px solid #e8c0cc; border-radius:20px; padding:2px 8px; font-size:10px; color:#9a5060; }
 
@@ -449,7 +458,6 @@ const baseStyle = `
   .back-link { background:none; border:none; font-size:12px; color:#b08888; cursor:pointer; text-decoration:underline; font-family:'Noto Serif SC',serif; }
 
   .img-loading { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; background:linear-gradient(160deg,#f5e5e8,#ead8dc); border-radius:8px; border:0.5px solid #e8c8d0; font-size:10px; color:#c09098; }
-  .img-error { display:flex; align-items:center; justify-content:center; background:#f5f0f0; border-radius:8px; border:0.5px solid #e8d8d8; font-size:10px; color:#c0a0a0; }
   .img-spinner { width:18px; height:18px; border-radius:50%; border:2px solid rgba(200,160,160,0.2); border-top-color:#d08098; animation:spin 0.8s linear infinite; }
 
   .spinner { width:36px; height:36px; border-radius:50%; border:3px solid rgba(200,160,160,0.2); border-top-color:#d08098; animation:spin 0.8s linear infinite; }
